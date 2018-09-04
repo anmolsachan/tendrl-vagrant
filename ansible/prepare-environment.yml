@@ -47,13 +47,17 @@
         key: "{{ item.stdout }}"
       with_items: "{{ ssh_known_host_results.results }}"
 
-    - name: add EPEL
-      yum:
-        name: epel-release
-        state: present
+#    - name: Set authorized key taken from known hosts for vagrant
+#      authorized_key:
+#        user: vagrant
+#        state: present
+#        key: "{{ lookup('file', '/root/known_machines.pub') }}"
+#
+#    - name: Set authorized key taken from known hosts for root
+#      authorized_key:
+#        user: root
+#        state: present
+#        key: "{{ lookup('file', '/root/known_machines.pub') }}"
 
-    - name: add copr
-      yum:
-        name: yum-plugin-copr
-        state: present
 ...
+

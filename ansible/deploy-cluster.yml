@@ -1,6 +1,6 @@
-- name: Deploy gluster
+---
 
-  hosts: gluster-servers
+- hosts: gluster-servers
 
   become: true
 
@@ -17,3 +17,33 @@
 
     - name: Run GDeploy
       shell: 'gdeploy -c /tmp/gdeploy.conf'
+
+    - name: Remove epel repo
+      yum_repository:
+        name: epel
+        file: epel
+        state: absent
+
+    - name: Remove epel-testing repo
+      yum_repository:
+        name: epel
+        file: epel-testing
+        state: absent
+
+- hosts: tendrl-server
+
+  become: true
+
+  tasks:
+    - name: Remove epel repo
+      yum_repository:
+        name: epel
+        file: epel
+        state: absent
+
+    - name: Remove epel-testing repo
+      yum_repository:
+        name: epel
+        file: epel-testing
+        state: absent
+...

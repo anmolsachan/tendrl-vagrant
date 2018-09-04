@@ -1,14 +1,74 @@
 ---
 
+- hosts: tendrl-server
+
+  become: true
+
+  tasks:
+    - name: Install external WA repo
+      get_url:
+        url: 
+        dest: /etc/yum.repos.d/external-Server-RH-Gluster-3.4-WebAdministration.repo
+        mode: 0777
+
+    - name: Install WA repo
+      get_url:
+        url:
+        dest: /etc/yum.repos.d/Server-RH-Gluster-3.4-WebAdministration.repo
+        mode: 0777
+
+    - name: Create a ext4 filesystem on /dev/vdb
+      filesystem:
+        fstype: ext4
+        dev: /dev/vdb
+
+    - name: Create a ext4 filesystem on /dev/vdc
+      filesystem:
+        fstype: ext4
+        dev: /dev/vdc
+
+    - name: Mount etcd drive
+      mount:
+        path: /var/lib/etcd
+        src: /dev/vdb
+        fstype: ext4
+        state: mounted
+
+    - name: Mount carbon drive
+      mount:
+        path: /var/lib/carbon
+        src: /dev/vdc
+        fstype: ext4
+        state: mounted
+
 - hosts: gluster-servers
 
   become: true
 
   tasks:
-    - name: add gluster repo
-      yum:
-        name: centos-release-gluster
-        state: present
+    - name: Install external gluster repo
+      get_url:
+        url:
+        dest: /etc/yum.repos.d/external-Server-RH-Gluster-3.4-Server.repo
+        mode: 0777
+
+    - name: Install external Node-Agent repo
+      get_url:
+        url:
+        dest: /etc/yum.repos.d/external-Server-RH-Gluster-3.4-NodeAgent.repo
+        mode: 0777
+
+    - name: Install gluster repo
+      get_url:
+        url: 
+        dest: /etc/yum.repos.d/Server-RH-Gluster-3.4-Server.repo
+        mode: 0777
+
+    - name: Install Node-Agent repo
+      get_url:
+        url: 
+        dest: /etc/yum.repos.d/Server-RH-Gluster-3.4-NodeAgent.repo
+        mode: 0777
 
     - name: Install GlusterFS Server
       yum:
@@ -20,5 +80,7 @@
         name: glusterd
         enabled: yes
         state: started
-
 ...
+
+
+

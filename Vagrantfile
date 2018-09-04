@@ -41,8 +41,10 @@ end
 # General VM settings applied to all VMs
 #################
 VMCPU = 1         # number of cores per VM
-VMMEM = 1024      # amount of memory in MB per VM
-VMDISK = '256m'.freeze # size of brick disks in MB
+VMMEM = 4096      # amount of memory in MB per VM
+VMDISK = '10240m'.freeze # size of brick disks in MB
+VMDISKETCD= '51200m'.freeze # size of brick disks in MB
+VMDISKCARBON= '102400m'.freeze # size of brick disks in MB
 # Metadata volume isn't generated if <200MB:
 # https://github.com/gluster/gdeploy/blob/0462ad54f1d8f9c83502e774246a528ae2c8c83f/modules/lv.py#L168
 
@@ -112,8 +114,16 @@ def libvirt_attach_disks(disks, provider)
   end
 end
 
+def libvirt_attach_disks_server(disks, provider)
+  (1..1).each do
+    provider.storage :file, bus: 'virtio', size: VMDISKETCD
+    provider.storage :file, bus: 'virtio', size: VMDISKCARBON
+  end
+end
+
 # Vagrant config section starts here
 Vagrant.configure(2) do |config|
+  #config.registration.unregister_on_halt = false
   config.vm.box = 'centos/7'
 
   config.vm.provider 'virtualbox' do |vb, _override|
@@ -128,6 +138,11 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.network 'private_network', type: 'dhcp', auto_config: true
+
+  # Below config is for public network ................uncomment it and comment the above
+  # config.vm.network "public_network", :bridge => 'em1', :dev => 'em1'
+  # config.vm.network "forwarded_port", guest: 80, host: 8080
+  # config.vm.network "forwarded_port", guest: 2379, host: 2379
 
   config.vm.synced_folder 'api', '/usr/share/tendrl-api', disabled: true,
     type: 'rsync', rsync__exclude: %w[.git vendor/bundle .bundle .gitignore .rspec .ruby-gemset .ruby-version .travis.yml],
@@ -164,6 +179,13 @@ Vagrant.configure(2) do |config|
 
       # connect to local libvirt daemon as root
       libvirt.username = 'root'
+
+      # Use virtio device drivers
+      libvirt.nic_model_type = 'virtio'
+      libvirt.disk_bus = 'virtio'
+
+      # attach brick disks
+      libvirt_attach_disks_server(disk_count, libvirt)
     end
     machine.vm.provision 'bounce_services', type: 'ansible', run: 'never' do |ansible|
       ansible.limit = 'all'
@@ -253,9 +275,6 @@ Vagrant.configure(2) do |config|
 
         if tendrl_init
           ENV['ANSIBLE_ROLES_PATH'] = "#{ENV['ANSIBLE_ROLES_PATH']}:tendrl-ansible/roles"
-          puts '  Pulling submodule Tendrl/tendrl-ansible'
-          `git submodule init`
-          `git submodule update`
           machine.vm.provision :deploy_tendrl, type: :ansible do |ansible|
             ansible.limit = 'all'
             ansible.groups = {
