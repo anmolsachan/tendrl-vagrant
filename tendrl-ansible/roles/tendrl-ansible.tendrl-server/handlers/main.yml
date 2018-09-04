@@ -1,0 +1,42 @@
+---
+# handlers file for tendrl-server
+
+- name: restart etcd
+  service:
+    name=etcd
+    state=restarted
+
+- name: restart tendrl-api
+  service:
+    name=tendrl-api
+    state=restarted
+
+- name: restart httpd
+  service:
+    name=httpd
+    state=restarted
+
+- name: restart rsyslog
+  service:
+    name=rsyslog
+    state=restarted
+
+- name: restart tendrl-node-agent
+  service:
+    name=tendrl-node-agent
+    state=restarted
+
+- name: restart tendrl-monitoring-integration
+  service:
+    name=tendrl-monitoring-integration
+    state=restarted
+
+- name: restart grafana-server
+  service:
+    name=grafana-server
+    state=restarted
+
+- name: restart tendrl-notifier
+  service:
+    name=tendrl-notifier
+    state=restarted

@@ -1,0 +1,17 @@
+---
+# tasks file for tendrl-node
+
+- name: Install tendrl-selinux
+  yum:
+    name=tendrl-selinux
+    state=latest
+
+- name: Install tendrl-collectd-selinux
+  yum:
+    name=tendrl-collectd-selinux
+    state=latest
+
+- include: rsyslog.yml
+- include: tendrl-node-agent.yml
+- include: firewalld.yml
+  when: configure_firewalld_for_tendrl == True

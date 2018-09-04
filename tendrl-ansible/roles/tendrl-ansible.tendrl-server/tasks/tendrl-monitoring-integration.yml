@@ -1,0 +1,133 @@
+---
+
+- name: Install tendrl-monitoring-integration
+  yum:
+    name=tendrl-monitoring-integration
+    state=latest
+
+#
+# graphite (consists of carbon, whisper and graphite web) configuration
+#
+
+- name: Install carbon-selinux
+  yum:
+    name=carbon-selinux
+    state=latest
+
+- name: Initialize graphite-db
+  command: /usr/lib/python2.7/site-packages/graphite/manage.py syncdb --noinput
+  args:
+    creates: /var/lib/graphite-web/graphite.db
+  register: graphite_syncdb
+
+- debug: msg={{ graphite_syncdb.stdout }}
+
+- name: Allow apache to access graphite.db file
+  file:
+    path: /var/lib/graphite-web/graphite.db
+    owner: apache
+    group: apache
+
+- name: Start carbon-cache service
+  service:
+    name=carbon-cache
+    state=started
+
+- name: Enable carbon-cache service
+  service:
+    name=carbon-cache
+    enabled=yes
+
+#
+# grafana configuration
+#
+
+- name: Install tendrl-grafana-selinux
+  yum:
+    name=tendrl-grafana-selinux
+    state=latest
+
+- name: Configure grafana to use tendrl-monitoring-integration config
+  lineinfile:
+    dest=/etc/sysconfig/grafana-server
+    regexp={{ item.regexp }}
+    line={{ item.line }}
+  with_items:
+    - regexp: '^CONF_DIR=.*'
+      line: "CONF_DIR=/etc/tendrl/monitoring-integration/grafana/"
+    - regexp: '^CONF_FILE=.*'
+      line: "CONF_FILE=/etc/tendrl/monitoring-integration/grafana/grafana.ini"
+  notify:
+    - restart grafana-server
+
+- name: Configure admin password for grafana
+  ini_file:
+    path: /etc/tendrl/monitoring-integration/grafana/grafana.ini
+    section: security
+    option: admin_password
+    value: "{{ lookup('password', 'grafana_admin_passwd chars=ascii_letters length=30') }}"
+  notify:
+    - restart grafana-server
+
+- name: Enable grafana-server service
+  service:
+    name=grafana-server
+    enabled=yes
+    daemon_reload=yes
+
+- name: Start grafana-server service
+  service:
+    name=grafana-server
+    state=started
+
+#
+# configuration of monitoring integration itself
+#
+
+- name: Configure tendrl-monitoring-integration
+  lineinfile:
+    dest=/etc/tendrl/monitoring-integration/monitoring-integration.conf.yaml
+    regexp={{ item.regexp }}
+    line={{ item.line }}
+  with_items:
+    - regexp: '^datasource_host:.*'
+      line: "datasource_host: {{ graphite_fqdn }}"
+    - regexp: '^etcd_connection:.*'
+      line: "etcd_connection: {{ etcd_fqdn }}"
+  notify:
+    - restart tendrl-monitoring-integration
+
+- name: Configure etcd client-server authentication
+  lineinfile:
+    dest: /etc/tendrl/monitoring-integration/monitoring-integration.conf.yaml
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - regexp: '^#? *etcd_ca_cert_file:.*'
+      line: "etcd_ca_cert_file: {{ etcd_trusted_ca_file }}"
+    - regexp: '^#? *etcd_cert_file:.*'
+      line: "etcd_cert_file: {{ etcd_cert_file }}"
+    - regexp: '^#? *etcd_key_file:.*'
+      line: "etcd_key_file: {{ etcd_key_file }}"
+  notify:
+    - restart tendrl-monitoring-integration
+  when: etcd_tls_client_auth|bool == True
+
+- name: Configure grafana admin password in monitoring-integration.conf.yaml
+  lineinfile:
+    dest: /etc/tendrl/monitoring-integration/monitoring-integration.conf.yaml
+    insertafter: 'credentials:'
+    regexp: '^  password:.*'
+    line: "  password: {{ lookup('password', 'grafana_admin_passwd') }}"
+  notify:
+    - restart tendrl-monitoring-integration
+
+- name: Start tendrl-monitoring-integration service
+  service:
+    name=tendrl-monitoring-integration
+    state=started
+
+- name: Enable tendrl-monitoring-integration service
+  service:
+    name=tendrl-monitoring-integration
+    enabled=yes

@@ -1,0 +1,57 @@
+---
+# tasks file for tendrl-copr
+
+- name: This role works on CentOS only
+  assert:
+    that:
+      - ansible_distribution == "CentOS"
+
+# epel-release is directly available in centos extras repository
+- name: Install EPEL repo
+  yum:
+    name=epel-release
+    state=present
+
+# we can trust the key here because it comes from rpm package from extras repo
+- name: Import EPEL rpm-gpg key
+  rpm_key:
+    key=/etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+    state=present
+
+#
+# Tendrl repo
+#
+
+- name: Install Tendrl repo
+  copy:
+    src: "{{ tendrl_corp_repos[tendrl_copr_repo].repofile }}"
+    dest: /etc/yum.repos.d
+
+- name: Install Tendrl rpm-gpg key
+  copy:
+    src: "{{ tendrl_corp_repos[tendrl_copr_repo].repokey }}"
+    dest: /etc/pki/rpm-gpg
+
+- name: Import Tendrl rpm-gpg key
+  rpm_key:
+    key: "/etc/pki/rpm-gpg/{{ tendrl_corp_repos[tendrl_copr_repo].repokey }}"
+    state: present
+
+#
+# Tendrl Dependencies repo
+#
+
+- name: Install Tendrl Dependencies repo
+  copy:
+    src='tendrl-dependencies-epel-7.repo'
+    dest=/etc/yum.repos.d
+
+- name: Install Tendrl Dependencies rpm-gpg key
+  copy:
+    src='RPM-GPG-KEY-Tendrl-Dependencies'
+    dest=/etc/pki/rpm-gpg
+
+- name: Import Tendrl Dependencies rpm-gpg key
+  rpm_key:
+    key=/etc/pki/rpm-gpg/RPM-GPG-KEY-Tendrl-Dependencies
+    state=present

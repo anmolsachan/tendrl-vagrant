@@ -1,0 +1,60 @@
+---
+
+- name: Install tendrl-node-agent
+  yum:
+    name=tendrl-node-agent
+    state=latest
+  notify:
+   - restart rsyslog
+
+- name: Configure etcd and graphite ip addr in node-agent.conf.yaml
+  lineinfile:
+    dest: /etc/tendrl/node-agent/node-agent.conf.yaml
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - regexp: '^etcd_connection:.*'
+      line: "etcd_connection: {{ etcd_fqdn }}"
+    - regexp: '^graphite_host:.*'
+      line: "graphite_host: {{ graphite_fqdn }}"
+  notify:
+    - restart tendrl-node-agent
+
+- name: Configure etcd client-server authentication
+  lineinfile:
+    dest: /etc/tendrl/node-agent/node-agent.conf.yaml
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - regexp: '^#? *etcd_ca_cert_file:.*'
+      line: "etcd_ca_cert_file: {{ etcd_trusted_ca_file }}"
+    - regexp: '^#? *etcd_cert_file:.*'
+      line: "etcd_cert_file: {{ etcd_cert_file }}"
+    - regexp: '^#? *etcd_key_file:.*'
+      line: "etcd_key_file: {{ etcd_key_file }}"
+  notify:
+    - restart tendrl-node-agent
+  when: etcd_tls_client_auth|bool == True
+
+- name: Configure graphite_port in node-agent.conf.yaml (only when needed)
+  lineinfile:
+    dest: /etc/tendrl/node-agent/node-agent.conf.yaml
+    regexp: '^graphite_port:.*'
+    line: "graphite_port: {{ graphite_port }}"
+  when: graphite_port is defined
+  notify:
+    - restart tendrl-node-agent
+
+- name: Enable tendrl-node-agent service
+  service:
+    name=tendrl-node-agent
+    enabled=yes
+
+- name: Start tendrl-node-agent service
+  service:
+    name=tendrl-node-agent
+    state=started
+  notify:
+   # workaround for case when a new tendrl-node-agent package is installed
+   # during "Update all installed packages" task
+   - restart rsyslog
