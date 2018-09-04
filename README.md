@@ -1,6 +1,8 @@
-# Tendrl/api development with Vagrant
+# Vagrant Setup for tendrl
 
-A Vagrant setup for development of tendrl-api.
+This setup is a modified version of Tendrl-Vagrant Upstream( 
+https://github.com/Tendrl/tendrl-vagrant by 
+[Shirshendu Mukherjee](https://github.com/shirshendu) ) .
 
 This will setup as many gluster storage nodes as you want with a number of bricks that you can define!
 It works with your local tendrl-api server and tendrl-ui setup.
@@ -60,20 +62,84 @@ It uses vagrant's ansible plugin, so you will need ansible (>=2.4) on your host 
     * `brew install git`
   * install ansible
     * `brew install ansible`
+    
+## Features 
+* Can be deployed on local system or on a remote machine.
+* Can be shared with others.
+
+## Note
+* Please go through the complete document below before starting the deployment.
+* The VM’s created by this setup are of Centos base image (RHEL will be updated soon)
+* It would be better to run commands as root user
+* It is recommended to make a Private Setup for local system
+* Public setup is necessary if the host machine is a remote machine (eg lab machines)
+* Private setup cannot be shared with others but public can be.
+
+
 
 ## Get started
 * Clone this repository
-  * `git clone https://github.com/shirshendu/tendrl-vagrant.git`
+  * `git clone https://github.com/anmolsachan/tendrl-vagrant/tree/downstream`
 * Goto the folder in which you cloned this repo
   * `cd tendrl-vagrant`
 * if you are a returning user run `git pull` to ensure you have the latest updates
-* if you are on RHEL/Fedora and your don't want your libvirt storage domain `default` to be used, override the storage domain like this
+* if you are on RHEL/Fedora and you don't want your libvirt storage domain `default` to be used, override the storage domain like this
   * `export LIBVIRT_STORAGE_POOL=images`
 * `cp tendrl.conf.yml.sample tendrl.conf.yml`
   * Decide how many storage nodes and how many bricks you need
   * Decide if you want vagrant to initialize the cluster (`gdeploy`) for you
   * If you opted to initialize the cluster, decide whether you want to deploy tendrl
   * edit options in this file
+* Configure tendrl repos :
+    * open file ./ansible/prepare-gluster.yml
+    * For all the required repos provide `url` and `dest` fields accordingly in the file.
+* Configuring vagrant to bridge with the host’s network ( Important )
+    * Creating a PRIVATE Setup (Default)
+        * No changes required.
+    * Creating a PUBLIC Setup
+        * This setup creates public VM’s which acquire IP’s from DHCP to which the host machine is connected.
+        * (Requirement/ limitation)This requires your host machine to be connected to be connected to a wired connection (Ipv4) like eth0 , em1, etc.
+        * Replace `config.vm.network 'private_network', type: 'dhcp', auto_config: true` On line 140 of Vagrantfile with
+            ```
+                config.vm.network "public_network", :bridge => 'em1', :dev => 'em1'
+                config.vm.network "forwarded_port", guest: 80, host: 8080
+                config.vm.network "forwarded_port", guest: 2379, host: 2379
+            ```
+        * Configure the parameters `:bridge`  and `:dev`
+            * `config.vm.network "public_network", :bridge => 'em1', :dev => 'em1'`
+        * To find the network interface which your host machine has do `ip a` or `ip link show`
+        * Copy the interface which provides public (lan) ip to your device eg: eth0, em0, em1, etc.
+        * Uncomment the below lines (50-60) in file ./ansible/prepare-environment.yml
+            ``` 
+            - name: Set authorized key taken from know hosts for vagrant
+              authorized_key:
+                user: vagrant
+                state: present
+                key: "{{ lookup('file', '/root/known_machines.pub') }}"
+
+            - name: Set authorized key taken from know hosts for root
+              authorized_key:
+                user: root
+                state: present
+                key: "{{ lookup('file', '/root/known_machines.pub') }}"
+            ```
+* VM spec configurations (#optional):
+    * VM spec configurations (#optional):
+        * tendrl storage nodes
+            * Number of disks configured in tendrl.conf.yml
+        * tendrl server node :
+            * 3 disks :
+                * OS
+                * Mount point for etcd
+                * Mount point for carbon
+            * You can configure the size of the etcd and carbon disks (but not OS) in Vagrantfile. 
+* Provision to share the setup (For PUBLIC setup only):
+    * Create file `/root/known_machines.pub` (default path)on the host machine.
+    * If you do not want to use the path `/root/known_machines.pub`    
+    Configure the path at location in the downloaded folder : /ansible/prepare-environment.yml  ---> lines 54 and line 60.
+    * Copy your the public key ( ~/.ssh/id_rsa.pub ) into the file root/known_machines.pub . You can add public keys of other users to the file.
+    * If you want to share your setup with users after the setup is created, you will have to add the public keys of other users at /root/.ssh/authorized_keys  in all the nodes.
+
 * Run `vagrant up`
   * Wait a while
 
@@ -96,53 +162,65 @@ Please try restarting `libvirtd` with `sudo systemctl restart libvirtd`
   * if you run `vagrant up` again you without running `vagrant destroy` before you will overwrite your configuration and vagrant may loose track of some VMs (it's safe to remove them manually)
 * modify the `VMMEM` and `VMCPU` variables in the Vagrant file to change the VM resources, adjust `VMDISK` to change brick device sizes
 
-## What happens under the covers
-* After starting the storage node VMs:
-  * the hosts file is prepopulated
-  * all glusters packages are pre-installed (allows you to continue offline)
-  * the centos images are subscribed to epel, copr repositories 
-* If you decided to have vagrant initialize the cluster
-  * a gdeploy.conf is generated
-  * gdeploy was executed with the gdeploy.conf file
-  * cluster is peered
-  * all block devices have been set up of VGs, LVs, formatted and mounted (`gdeploy`'s standard backend-setup)
-  * brick directories have been created
-* If you decided to deploy tendrl
-  * tendrl-ansible roles are downloaded
-  * an additional VM will run tendrl server components
-  * the Ansible inventory and tendrl install playbook have been generated
-  * the installation playbook has been executed on the Tendrl server and storage nodes
-  * the Tendrl UI is reachable on the IP address of the eth1 adapter of the Tendrl VM (the URL also displayed after the installer finished)
+## For more info visit: 
+* https://github.com/Tendrl/tendrl-vagrant
+* https://www.vagrantup.com/docs/
 
-## Clean up / Refresh images
+## ADD-ON (Optional) - Heketi deployment for creating and managing volumes
 
-If you like to clean up disk space or there are updates to the images do the following:
+* By default this setup creates volumes using gdeploy.
+* If you want to create volumes using heketi , you need to make changes to the following files to remove volume creation by gdeploy ( Needs to be done before running vagrant up)
+    * In ansible/templates
+        * File gdeploy-libvirt.conf.j2  and file gdeploy-virtualbox.conf.j2, remove following
+            ```
+            [backend-setup]
+            devices={{ devices|join(",") }}
+            brick_dirs=brick{1..{{ devices|length }}}
+            
+            [volume]
+            action=create
+            replica=yes
+            replica_count=2
+            force=yes
+            ```
+* Steps to deploy Heketi on the tendrlc server node :
+    * Ssh to server node
+    * DO 
+        ``` 
+        $ yum install wget -y
 
-* on VirtualBox - remove the VM instances named `packer-tendrl-server-...` and `packer-tendrl-node-...` (these are base images for the clones)
-* on libvirt
-  * run `virsh vol-list default` to list all images in your `default` storage pool (adjust the name if you are using a different one)
-  * run `virsh vol-delete tendrl-node-... default` and  `virsh vol-delete tendrl-server-... default` to delete the images starting with `tendrl-node-...` and `tendrl-server-...` (replace with full name) from the default pool
-* run `vagrant box update`
+        $ wget https://github.com/heketi/heketi/releases/download/v6.0.0/heketi-v6.0.0.linux.amd64.tar.gz
+        
+        $ tar xzvf heketi-v6.0.0.linux.amd64.tar.gz
+        
+        $ mkdir /var/lib/heketi
 
-Next time you do `vagrant up` it will automatically pull new images.
+        ```
+    * Configure heketi.json
+        * Change directory to heketi folder
+        * There is already a config file present in the setup directory (heketi/heketi.json). You can replace the heketi.json in pwd with that.
+        `export HEKETI_CLI_SERVER=http://localhost:8080`
+    * Run heketi server
+        `./heketi --config=heketi.json`
+    * In a new terminal , go to same extracted heketi directory
+        * Create a file named topology_libvirt.json
+        * You can replace the above with the file present in the setup directory (heketi/topology_libvirt.json).
+        * For each node provide storage node ips and device info in the topology_libvirt.json
+        * Load the topology by :
+        `./heketi-cli topology load --json=topology_libvirt.json`
+        
+    * Create volume eg : `./heketi-cli volume create --size=1 --replica=2`
+        
 
-## Known issues
-* `vagrant up` overrides your state - if there are still VMs running and you do `vagrant up` it will override the `vagrant_env.conf` and vagrant will loose track of your existing VMs
-  * try to remember to run `vagrant destroy -f` before you do another `vagrant up`
-  * delete left-over VMs manually in case you forgot
-
-## Creating your own vagrant box
-If you - for whatever reason - do not want to use my prebuilt box, you can create your own box very easy!  
-
-**BEWARE** this is for advanced users only!
-
-* Get [packer](https://www.packer.io/)
-* `git checkout` the "packer" branch of this repository, follow the README
+#### Cheers !
 
 ## Author
+[Anmol Sachan](https://github.com/anmolsachan)
+
+## Orignal Author
 [Shirshendu Mukherjee](https://github.com/shirshendu)
 
-## Original Authors
+## Ultimate Orignal Authors
 [Christopher Blum](https://github.com/zeichenanonym)
 
 [Daniel Messer](mailto:dmesser@redhat.com) - [dmesser@redhat.com](mailto:dmesser@redhat.com) -

@@ -5,16 +5,16 @@
   become: true
 
   tasks:
-    - name: Install external WA repo
+    - name: Install external tendrl repo
       get_url:
         url: 
-        dest: /etc/yum.repos.d/external-Server-RH-Gluster-3.4-WebAdministration.repo
+        dest: /etc/yum.repos.d/external-tendrl.repo
         mode: 0777
 
-    - name: Install WA repo
+    - name: Install tendrl repo
       get_url:
         url:
-        dest: /etc/yum.repos.d/Server-RH-Gluster-3.4-WebAdministration.repo
+        dest: /etc/yum.repos.d/tendrl.repo
         mode: 0777
 
     - name: Create a ext4 filesystem on /dev/vdb
@@ -49,25 +49,25 @@
     - name: Install external gluster repo
       get_url:
         url:
-        dest: /etc/yum.repos.d/external-Server-RH-Gluster-3.4-Server.repo
+        dest: /etc/yum.repos.d/tendrl-Server.repo
         mode: 0777
 
     - name: Install external Node-Agent repo
       get_url:
         url:
-        dest: /etc/yum.repos.d/external-Server-RH-Gluster-3.4-NodeAgent.repo
+        dest: /etc/yum.repos.d/tendrl-NodeAgent.repo
         mode: 0777
 
     - name: Install gluster repo
       get_url:
         url: 
-        dest: /etc/yum.repos.d/Server-RH-Gluster-3.4-Server.repo
+        dest: /etc/yum.repos.d/gluster-Server.repo
         mode: 0777
 
     - name: Install Node-Agent repo
       get_url:
         url: 
-        dest: /etc/yum.repos.d/Server-RH-Gluster-3.4-NodeAgent.repo
+        dest: /etc/yum.repos.d/tendrl-NodeAgent.repo
         mode: 0777
 
     - name: Install GlusterFS Server
